@@ -1,0 +1,265 @@
+/* 
+  wall is inert, used for
+  walls, window frames, door frames
+*/
+
+import java.util.Scanner;
+import java.util.ArrayList;
+import java.io.PrintWriter;
+
+public class Wall extends Block {
+
+  private static int[] wallTextures = { 3, 4, 3, 4, 3, 4, 3, 4 };
+  private static int[] floorTextures = { 7, 7, 7, 7, 7, 7 };
+  private static int[] stepTextures = { 5, 6, 5, 6, 5, 6, 5, 6 };
+  private static int[] cursorTextures = { 8, 8, 8, 8, 8, 8 };
+
+  private static double[] skyScales = { 200, 200, 200, 200, 200, 200 };
+  private static double[] groundScales = { 10, 10, 10, 10, 10, 10 };
+  private static double[] wallScales = { 8, 8, 8, 8, 8, 8 };
+  private static double[] floorScales = { 8, 8, 8, 8, 8, 8 };
+  private static double[] stepScales = { 2, 2, 2, 2, 2, 2 };
+  private static double[] cursorScales = { 2, 2, 2, 2, 2, 2 };
+
+  private static int[] clownTextures = { 0, 1, 2, 3, 4, 5 };
+  private static double[] clownScales = { 20, 20, 20, 20, 20, 20 };
+
+  public static double typWallWidth=4, typWallThickness=1, typWallHeight=12;
+  public static double typFloorWidth=4, typFloorLength=4, typFloorHeight=1;
+
+  private String kind;  // kind of block
+
+  private double cx, cy, cz;  //  current center point of the block
+  private double sx, sy, sz;  // size of block---never changes for a specific
+                              // block
+
+  private Triple vel;  // current translational velocity for this block
+
+  // texture info for the 6 faces
+  private int[] textures;  // texture number for each face in standard order
+                           // front, right, back, left, top, bottom
+  private double[] texScales;  // each kind of block has its own texture
+                               // scaling
+
+  public Wall(
+  // build a block from data file
+  public Block( String knd, Scanner input ) {
+
+    kind = knd; 
+
+    // all kinds share these fields:
+
+    cx = input.nextDouble(); cy = input.nextDouble(); cz = input.nextDouble(); 
+    input.nextLine();
+    sx = input.nextDouble(); sy = input.nextDouble(); sz = input.nextDouble(); 
+    input.nextLine();
+
+    finishBuildFromKind();
+
+  }
+
+  public Block( String knd, double ctrX, double ctrY, double ctrZ,
+                double sizeX, double sizeY, double sizeZ ) {
+
+    kind = knd;
+    cx = ctrX;  cy = ctrY;  cz = ctrZ;  
+    sx = sizeX; sy = sizeY; sz = sizeZ;
+
+    finishBuildFromKind();
+  }
+
+  // construct copy of other with center changed to (a,b,c)
+  public Block( Block other, double a, double b, double c ) {
+
+    kind = other.kind;
+    cx = a;  cy = b;  cz = c;  
+    sx = other.sx; sy = other.sy; sz = other.sz; 
+    finishBuildFromKind();
+  }
+
+  // depending on kind, initialize other fields
+  private void finishBuildFromKind() {
+
+    if( kind.equals( "sky" ) ) {
+      textures = skyTextures;
+      texScales = skyScales;
+    }
+    else if( kind.equals( "ground" ) ) { 
+      textures = groundTextures;
+      texScales = groundScales;
+    }
+    else if( kind.equals( "wall" ) ) {
+      textures = wallTextures;
+      texScales = wallScales;
+    }
+    else if( kind.equals( "floor" ) ) {
+      textures = floorTextures;
+      texScales = floorScales;
+    }
+    else if( kind.equals( "step" ) ) {
+      textures = stepTextures;
+      texScales = stepScales;
+    }
+    else if( kind.equals( "clown" ) ) {
+      textures = clownTextures;
+      texScales = clownScales;
+    }
+    else if( kind.equals( "cursor" ) ) {
+      textures = cursorTextures;
+      texScales = cursorScales;
+    }
+
+  }// buildFromKind
+
+  // "draw" by adding 12 triangles for this block to the
+  // given list
+  public void draw( ArrayList<Triangle> list ) {
+    Vertex v1, v2, v3;  // convenience
+
+    // front face (index 0) --------------------
+
+    v1 = new Vertex( cx-sx, cy-sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx+sx, cy-sy, cz-sz, 2*sx/texScales[0], 0 );
+    v3 = new Vertex( cx+sx, cy-sy, cz+sz, 
+                      2*sx/texScales[0], 2*sz/texScales[0] );
+    list.add( new Triangle( v1, v2, v3, textures[0] ) );
+
+    v1 = new Vertex( cx-sx, cy-sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx+sx, cy-sy, cz+sz, 
+                       2*sx/texScales[0], 2*sz/texScales[0] );
+    v3 = new Vertex( cx-sx, cy-sy, cz+sz, 0, 2*sz/texScales[0] );
+    list.add( new Triangle( v1, v2, v3, textures[0] ) );
+
+    // right face (index 1) --------------------
+
+    v1 = new Vertex( cx+sx, cy-sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx+sx, cy+sy, cz-sz, 2*sy/texScales[1], 0 );
+    v3 = new Vertex( cx+sx, cy+sy, cz+sz, 
+                       2*sy/texScales[1], 2*sz/texScales[1] );
+    list.add( new Triangle( v1, v2, v3, textures[1] ) );
+
+    v1 = new Vertex( cx+sx, cy-sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx+sx, cy+sy, cz+sz, 
+                       2*sy/texScales[1], 2*sz/texScales[1] );
+    v3 = new Vertex( cx+sx, cy-sy, cz+sz, 0, 2*sz/texScales[1] );
+    list.add( new Triangle( v1, v2, v3, textures[1] ) );
+
+    // back face (index 2) --------------------
+
+    v1 = new Vertex( cx+sx, cy+sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx-sx, cy+sy, cz-sz, 2*sx/texScales[2], 0 );
+    v3 = new Vertex( cx-sx, cy+sy, cz+sz, 
+                       2*sx/texScales[2], 2*sz/texScales[2] );
+    list.add( new Triangle( v1, v2, v3, textures[2] ) );
+
+    v1 = new Vertex( cx+sx, cy+sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx-sx, cy+sy, cz+sz, 
+                       2*sx/texScales[2], 2*sz/texScales[2] );
+    v3 = new Vertex( cx+sx, cy+sy, cz+sz, 0, 2*sz/texScales[2] );
+    list.add( new Triangle( v1, v2, v3, textures[2] ) );
+
+    // left face (index 3) --------------------
+
+    v1 = new Vertex( cx-sx, cy+sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx-sx, cy-sy, cz-sz, 2*sy/texScales[3], 0 );
+    v3 = new Vertex( cx-sx, cy-sy, cz+sz, 
+                       2*sy/texScales[3], 2*sz/texScales[3] );
+    list.add( new Triangle( v1, v2, v3, textures[3] ) );
+
+    v1 = new Vertex( cx-sx, cy+sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx-sx, cy-sy, cz+sz, 
+                       2*sy/texScales[3], 2*sz/texScales[3] );
+    v3 = new Vertex( cx-sx, cy+sy, cz+sz, 0, 2*sz/texScales[3] );
+    list.add( new Triangle( v1, v2, v3, textures[3] ) );
+
+    // top face (index 4) --------------------
+
+    v1 = new Vertex( cx-sx, cy-sy, cz+sz, 0, 0 );
+    v2 = new Vertex( cx+sx, cy-sy, cz+sz, 2*sx/texScales[4], 0 );
+    v3 = new Vertex( cx+sx, cy+sy, cz+sz, 
+                       2*sx/texScales[4], 2*sy/texScales[4] );
+    list.add( new Triangle( v1, v2, v3, textures[4] ) );
+
+    v1 = new Vertex( cx-sx, cy-sy, cz+sz, 0, 0 );
+    v2 = new Vertex( cx+sx, cy+sy, cz+sz, 
+                       2*sx/texScales[4], 2*sy/texScales[4] );
+    v3 = new Vertex( cx-sx, cy+sy, cz+sz, 0, 2*sy/texScales[4] );
+    list.add( new Triangle( v1, v2, v3, textures[4] ) );
+
+    // bottom face (index 5) --------------------
+
+    v1 = new Vertex( cx-sx, cy+sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx+sx, cy+sy, cz-sz, 2*sx/texScales[5], 0 );
+    v3 = new Vertex( cx+sx, cy-sy, cz-sz, 
+                       2*sx/texScales[5], 2*sy/texScales[5] );
+    list.add( new Triangle( v1, v2, v3, textures[5] ) );
+
+    v1 = new Vertex( cx-sx, cy+sy, cz-sz, 0, 0 );
+    v2 = new Vertex( cx+sx, cy-sy, cz-sz, 
+                       2*sx/texScales[5], 2*sy/texScales[5] );
+    v3 = new Vertex( cx-sx, cy-sy, cz-sz, 0, 2*sy/texScales[5] );
+    list.add( new Triangle( v1, v2, v3, textures[5] ) );
+
+  }// draw
+
+  // save info for this block to output file
+  public void save( PrintWriter out ) {
+    out.println( "   " + cx + " " + cy + " " + cz );
+    out.println( "   " + sx + " " + sy + " " + sz );
+  }
+
+  public void move( double dx, double dy, double dz ) {
+    cx += dx; cy += dy; cz += dz;
+  }
+
+  // rotate one notch (amount is ignored)
+  public void rotate( double amount ) {
+    double temp = sx;
+    sx = sy;
+    sy = temp;
+  }
+
+  // change size
+  public void resize( double wx, double wy, double wz ) {
+    if( sx + wx > 0 ) sx += wx;
+    if( sy + wy > 0 ) sy += wy;
+    if( sz + wz > 0 ) sz += wz;
+  }
+
+  public String getKind() {
+    return kind;
+  }
+
+  public double getX() { return cx; }
+  public double getY() { return cy; }
+  public double getZ() { return cz; }
+
+  // stub for a while
+  public void update( double time ) {
+  }
+
+  // return whether (a,b,c) touches
+  // this box
+  public boolean touches( double a, double b, double c ) {
+    return  cx-sx <= a && a <= cx+sx &&
+            cy-sy <= b && b <= cy+sy &&
+            cz-sz <= c && c <= cz+sz;
+  }
+
+  // compute [lambdaIn,lambdaOut] for lambdas for which
+  // ray a+lambda d hits this block
+  // (use -1 to signal never found entry/exit)
+  public double[] whenHitByRay( Triple a, Triple d ) {
+    AABB box = new AABB( cx-sx, cx+sx, cy-sy, cy+sy, cz-sz, cz+sz );
+    return box.whenHitByRay( a, d );
+  }
+
+ public void consoleDisplay() {
+   System.out.println("kind: " + kind );
+   System.out.println("location: ");
+   System.out.println("  x: " + cx + " y: " + cy + " z: " + cz );
+   System.out.println("size along: ");
+   System.out.println("  x: " + sx + " y: " + sy + " z: " + sz );
+ }
+
+}// Block

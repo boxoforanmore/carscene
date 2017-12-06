@@ -1,0 +1,2144 @@
+May 24, 2017
+
+Loosely starting from last summer's work (Version6) I'm going to try to
+get RB3 (Reality Blocks 3D) ready for at least the last sessions of SSI
+this summer.
+
+The plan is to not think of CS 3510 and building a general triangle mesh
+drawing system, but totally just draw AAB's, with all 6 faces texture
+mapped, using mapping customized for our purposes---I want to make lots
+of stone wall, sky, ground, floor, etc. blocks, all with integer multiple
+sizes, and texture map with tiling so the user can resize in integer
+chunks and have things look decent (before I was using blocks as tiles,
+now I'm planning to have, for example, one giant ground block that maps
+one grass image onto each 1 by 1 sub-rectangle on the top face.
+
+So, there's the graphics part, which is where I must start, and then there's
+the game engine part, where I hope to leverage the simplicity of axis-aligned
+boxes to get it working pretty easily (ha!  I'll bet!)
+
+Let's start by analyzing what I've got done in "Version6"---
+  but also start from scratch, except where I need to bring in OpenGL stuff.
+
+So, create Block---plan on using branching on kind to make various block
+behaviors, but pack everything into Block, no trying to be slick on this
+project!
+
+I'm shooting for a simplified version of RB---I'll provide a few kinds of
+block (wall, ground, floor, stair, player, monster, treasure, ...)
+preprogrammed, let them change code in small ways to customize their games
+
+I'm thinking at start of Builder and Game, do same thing with textures---load
+them all by hard-coded file name into array
+
+Look, let's hard-code Block.init() to create a prototype box of each
+kind, setting some instance variables to hard-coded info, then when
+read from a data file like:
+
+wall
+1 25 8
+50 55 4
+
+we'll call a copy constructor that copies the shared info (notably texture
+info that all wall pieces share) into instance variables of the new guy and
+sets individual instance variables to values read from data file.
+
+Taking a moment (or two) to recall how to use Convert and Clipper---let's write
+up a little in manual.tex that will be given to students
+ 
+Will do Picture.init() as the place in code to
+specify the texture file names
+
+As I keep looking at Version6, I realize that I want to put all the
+configuration stuff in a few files, give them a better experience of
+programming (they can stick to building a world, and playing games,
+but if they have a bit more excitement/aptitude, they can put their
+own downloaded images on some of the bodies, change lots of other
+things in the game---need to make it fairly obvious how to change the
+code to change the game.  
+
+I'm struggling a little with texture mapping.
+Want to allow flexibility in coverage, yet allow interactive resizing.
+Let's keep sizes of fixed blocks as ints....no,  doesn't matter.  What
+matters is that we need a "typical size" which is, in world coordinates,
+the distance that the texture map can happily span.
+I think that I can use texture coordinates like 0..10 and set so will
+tile 10 times.  The point is, for like sky, is a honking big face, 200 by 200,
+would like to be able to say, hey, typical size is 10, so will tile the
+blue sky image onto a 20 by 20 grid.  I think all we need (especially since
+we can pull sub-rectangles out of big images with Clipper) is typical size,
+and whether want to tile or not.
+
+For now, let's assume tiling, set up to turn it off later.
+It's time to look at the actual OpenGL stuff, I think----
+
+I barely understand my code to do texturing stuff!  
+It's okay, though, if it works---I think all I have to do
+is stupidify from arbitrary triangle meshes to boxes,
+don't have various hassles we had before for arbitrary mesh.
+No rotation, even!  
+
+
+Oops, 5:00, time to do some writing, pick up with some
+silly errors next time (fixed vs. mobile?)
+
+=============================
+May 25, 2017
+
+Obviously the solution is to put in a count
+for each group of blocks to be loaded, first the
+fixed blocks, then the mobile.
+
+Hmmm, okay, have some sort of textures showing up, but
+they're like not good!  Still, is encouraging.
+
+Seems like their might be 200 by 200 sky images.
+What's missing is ability to say "a single texture image
+looks best when it's covering this many units"
+
+The place texture coordinates are happening is in Block.display,
+I think---so, need to add texSizeX,Y to data, divide by those
+quantities.  So, currently have a giant sky block that is 200 by
+200, sx=sy=100, need to divide by like 20---let's try it.
+
+There are other issues, I believe, but do this first...
+
+Hmmm.  When resume, look at sky for Version6, see if can get
+same quality, figure out how to cleanly get texture scaling factor.
+Now that I think about it, this should be part of the Block,
+namely get to pick the texture image and how many of them are
+to be mapped onto each face.
+
+=============================
+May 26, 2017
+
+Hmmm.  Want to say each kind of Block should have its own 6 
+texture scale factors, but there's also the resizing issue.
+Maybe each texture should have the scale factor?  Nah, belongs
+in Block, let's do it!
+
+Okay, had a few errors, leading to weird visual effects.
+Next put in the top and bottom faces---
+
+Yay, texturing looks okay.  Now what?  Have to make the Builder, allow easy
+interactive building of a world, and have to add in physics, life, to make
+Game.  This will require the easy (I hope!) axis-aligned box physics, with
+gravity.
+
+I guess I should make Builder first, so I can quickly and relatively easily
+make a world, then add in the physics and a player in Game.
+
+Okay, idea is to edit code to customize everything, including what keys
+produce what kinds of blocks.  
+
+Important point:  separate the original 6 blocks (5 sky and 1 ground),
+remember how many from data file, so saved edited file can store that same
+info.  Let's set that up first---
+
+When resume (quitting early to binge watch O.J. documentary),
+test out the load/save stuff, continue with developing Builder
+
+=============================
+May 28, 2017
+
+So maybe load/save is working (problem with FileBrowser, no doubt due to some
+ugly threading issue, or something, so live with start with world1, save to
+world1, no options (can use OS to copy, rename world files, and should!)
+
+So, now, in small time we have today, start putting in the 3D cursor---consists
+of three boxes, is not put in mobile or fixed, is in its own tiny list---
+maybe cursorParts?
+  block 0 is a 1 by 1 by 1 cube whose center is the cursor location
+  
+No, need a Cursor class to manage stuff nicely, I think, or will be irritating.
+
+Resume: make a new Block constructor, add redfire texture for cursor, 
+         Cursor constructor---make three blocks with same center
+
+        cursor move --- change x,y,z and move all three blocks by same amount
+
+will make so the block touched by cursor is the one that can be edited---
+  move, resize, flip (only as allowed by kind), kill, copy (when make a copy,
+will be placed overlapping current, have to move it, perhaps flip, cursor
+moves with the changes
+... as I work on this, should be able to visualize better what works
+
+Just occurred to me that destruction could be a cool game feature---be able
+to knock out pieces of the building, somehow.  So, need to be able to
+
+=============================
+May 30, 2017
+
+Need to spiff up Block code constructors to not be repetitive---a support
+guy that copies
+
+=============================
+June 3, 2017
+
+onward---in Block constructors---huh, is done?!
+
+I was planning the key usage, I guess---
+
+use arrow keys plus PageUp PageDown to move either cursor or camera
+in 3D space?
+
+No, let's use the numeric keypad (I think the lab machines have such keys,
+if not I'll have to rework it) for controlling the camera (+/- x/y/z is
+6 keys, rotate both ways is 8, ... no, it's not working---back to modal,
+use c key (for camera and cursor---it's an omen!  Or change!) to toggle
+among camera, cursor (could be more later),
+cursor uses 6 keys for 3D location,
+camera adds in home/end for rotating, and two more keys (maybe -/=?) for
+tilting up/down,
+
+then use printable keys for manipulating the "current block" in lots of
+handy ways (following a sort of etch-a-sketch model):
+  x  xerox current block---the new one becomes current, and cursor is moved
+to mark it (maybe)
+  l r f b u d (move it left right forward back up down)
+  n w (narrower/wider in x direction), s t (shorter/taller in z direction),
+  ? ? (resize in y direction ..
+
+no, I think the xX yY zZ is better for moving, 
+    lL (length) dD (depth) hH (height) for resizing
+
+Let's keep it granular---meaning, like, a floor block always runs -x to +x, same for walls, steps, pillars
+
+Hit w f s p for wall floor step pillar
+
+Not sure about granularity---just realized there are basically 4 kinds of
+steps---want so when hit s, get the current step family of blocks, have to
+cunningly program so they are treated as a single unit, hitting digit key
+gives 1--9 steps, always touching in corners, and hitting rR rotates both
+ways (overkill, are only 4 positions).
+
+Is going to be problematic---I want separate blocks.  Easy way is to say that
+only at creation are some steps a unit, once we let go of a flight of steps
+as current, becomes just a bunch of blocks, can't resize or move as a unit.
+This is unacceptable.  I'm wondering whether I should allow assemblies of
+blocks in Builder (Game will only have individual blocks), could use for
+steps and also for wall units that have a hole in the inside---can hand-craft
+such guys as assembly of 4 wall pieces, somehow edit to change location,
+orientation (90 degree rotation), size, and location, size of hole inside
+the assembly.  The point is, could make one such assembly, then xerox,
+move, repeatedly until have a whole strip of such wall pieces.
+
+Might realize I need other assemblies, as well.  One kind of assembly will
+be singletons.
+
+So, assemblies will be f w h p s for floor, wall, hole (wall with hole),
+                                     pillar, steps
+
+Now I'm thinking should have geometry controlling keys (arrows, pageup/down,
+home/end for rotation about z axis (other rotations would violate meaning
+of the assemblies---laying a wall block down to make an apparent floor would
+screw up the textures)) should control cursor, camera, or current block
+
+Hmmm, toggling now too hard, should use m for marker (cursor), c for
+camera, b for block (also go to this mode whenever any assembly creation
+key is hit)---b makes block under the marker the current block
+
+ctrl+geometry keys resizes (for assemblies)
+
+Ha!  hole editing could use:
+        plain geometry keys to shift and rotate the wall/hole assembly
+        ctrl-geometry resizes the wall part
+        shift-geometry moves the hole
+        ctrl-shift-geometry resizes the hole
+(wow!  Do I really want to teach this to middle-school students?  Well,
+sure, I think they'll learn it fast, and many will make do with the
+default wall/hole assembly, I suppose)
+
+So, when I resume, I'll implement these ideas, after rechecking (worried a
+little about overlaps in keys, which can be irritating), see how 
+cumbersome it is.  
+
+I'm still wondering if step assembly should allow adjusting space between
+steps?  Sure, why not---will have ability to do so with the combinations
+of the various keys (using LWJGL key stuff big time here).
+
+I'll keep a simple list of assemblies, create blocks and then soups each
+time a key is hit (a human hitting a key is so slow that I think this will
+work just fine).  So, assemblies will use inheritance, maybe, just for the
+learning of it, will have highly customized instance variables and responses
+to keys, should be pretty easy and fun!
+
+Yay!
+
+=============================
+June 6, 2017
+
+Okay, Assembly is base class, each extension class has its own instance
+data to specify the current collection of related blocks, namely a
+single block, a collection of steps making a staircase, or 4 blocks forming
+a hole.
+
+I was really confused before---Builder needs no collision stuff, of course,
+duh!  So, we interactively edit, load/save, a list of Assembly instances,
+and each Assembly has ability to generate its current blocks, and
+add those to a single soup. 
+
+I was being quite stupid, using fixed and mobile lists, when in fact
+means nothing for Builder.
+
+So, with this clarity, let's proceed to make Builder.
+
+First, though, note an idea I had yesterday:  elevator assembly --- 
+could have enclosing tower, with openings on each floor, a floor inside
+that could somehow (harder physics!) carry mobile blocks up and down.
+
+Also could have sliding doors (not swinging since has to be axis-aligned).
+
+The point is, might add different kinds of assemblies later.
+
+But, you know, let's not get carried away.  This is meant for SSI, is just
+a limited toy to play with for a few hours.  Deeper thought (like, should
+Game have assemblies rather than blocks for physics---once turn an elevator
+into a collection of unrelated blocks, lose a lot).
+
+So, keep it simple, onward (note that assembly idea is getting into joints,
+which I don't understand at all yet, but might someday.  Though, frankly,
+I'm getting close to the point of dropping game programming learning, is
+just too irritating.  I'm getting interested in computer vision and AI,
+connected to robotics.  Those fields are probably very difficult to get
+into, also.  But maybe those researchers don't suck at writing up their
+stuff!  Probably not, though.  I have a theory that researchers only write
+up their stuff to get credit---they really don't want the reader to follow
+what they're saying and use it to their benefit.  If this is true, would
+apply to most fields).
+
+So, let's finish this RB3, then probably drop game programming, reluctantly.
+Want to continue with computer graphics, though, to the extent of doing a
+decent job of teaching 3510.
+
+My main requirement is my own amusement, tempered by desire to have some
+specialized, popular upper-division courses in whatever area I play with.
+
+Is good for me to use inheritance a little, just for learning, likely to
+teach 1050 numerous times in the future, probably should include
+inheritance a little, to the extent that it is the natural way to
+do something---something exactly like Assembly.
+
+Now I'm thinking that for Builder, the split is between blocks that
+are just put in for looks (sky and ground) and ones that can be
+edited (by putting the cursor on them and hitting various keys, 'x'
+for xerox at least)
+
+Input file format needs to have the kind of assembly, followed by
+data specifying details of that assembly.  To keep it straightforward,
+Builder will repeatedly read kind, then branch to call.
+
+When construct or modify an assembly, recompute its blocks.
+
+Okay, trying to get back to what I had, then do details of Stairs,
+Hole, hard-code in file, make sure shows up nicely, then implement
+interactive stuff.
+
+Oops, Soups need ability to take list of assemblies and add all the
+stuff for their blocks
+
+Yay, am back to earlier functionality.  Now let's add in some
+stairs, hard-coded---super fun to create blocks from spec data for
+Stairs
+
+Napped a little, now, a little scary:  hard-code a staircase and
+see how it looks!
+
+Okay, seems to be good.  Have about half an hour (have to write
+from about 4:55-5:30), let's start on the Hole class---
+
+Oops, I do need some collision stuff in Builder, namely to
+detect which if any assemblies are touching the cursor
+(just need hash table to do broad phase efficiently)
+
+The logic of figuring out blocks to create a
+given hole looks a little challenging (i.e., fun)
+
+I think is reasonable to not let hole out of the wall it's
+in---still have lots of cases.  Actually, I think won't be so
+bad.
+
+Resume:  finish Hole stuff for leftRight, test, then add in
+the y-z case.
+
+Once have the Assemblies done, put in the code to interactively
+work with them, to finish Builder!
+
+=============================
+June 7, 2017
+
+work on Hole---okay, yay, the x-z parallel hole looks good.
+Let's take a half hour walk, then do the y-z parallel,
+and then on to interactive stuff.
+
+Just realized in Game, I'll need to distinguish mobile from fixed
+blocks, but we'll just do that by kind, so Builder can insert a
+bunch of player lives, monsters, factories, mostly mobile, while
+walls, holes, stairs, floors are all fixed.  Is just for efficiency,
+of course.
+
+
+Okay, here we go, y-z parallel Hole---
+Okay, good, now let's install interactive
+
+When resume, continue with interactive keys---will need to put in
+some collision features---when hit 1 to make current block subject
+of keys, if there is no current block, scan all editable assemblies to
+find the first one that has the cursor's center inside one of its
+blocks.  Whenever hit a creation key, the new assembly becomes current.
+For now, I don't think I'm going to move the cursor to the current
+block, maybe later.  For starters, make all three as independent as
+makes sense (was also thinking about making the camera stay aimed
+dead center at the cursor).
+
+=============================
+June 8, 2017
+
+Okay, let's put in some creation keys, including setting current to
+the newest guy.
+
+Wait, I'm realizing I don't know what the cursor is for!  When hit 'w',
+(oh, now I get it!), create a wall assembly "at" the cursor.
+Same for all the others.  'x' is a great key, will copy current block,
+
+Oh, heck, I think I do want to keep the cursor on the current
+(it's dawning on me that the SSI kids will not be able to use this
+software,  probably!  Oh, well)
+
+As I had hoped, now that it's doing a little something, I'm getting
+a much better picture of how it will be most convenient, like with
+regard to whether the cursor should move with the current block  as
+it's being edited, other things.
+
+What next?  I think resizing the current assembly---
+
+Okay, resizing wall successfully.
+
+When resume, just keep plugging away, will probably finish the
+Builder pretty quickly, and pretty nicely.  It is really going
+to be pretty fun, I believe.  Even just building a maze with
+some treasure and such will be fun.
+
+=============================
+June 13, 2017  (Happy Anniversary!)
+
+Okay, I think the cursor needs to move with the current block, meaning
+when block moves, cursor stays with it, but when move the cursor,
+current block doesn't move.  Let's implement this idea with the limited
+guys I have already done---
+
+Okay, cursor and wall seem to be working (and camera) as desired, now
+let's put in floor, should be much like wall---
+(then move on to Holes and Stairs, and then new stuff---xerox requires
+making a copy of assembly the cursor is touching, and kill---requires
+knowing who the cursor is touching)---
+
+Okay, when resume, install Hole 'h' key, then on to xerox, kill, point to
+(all three look for assembly that cursor is touching, make it current,
+then copy it (very similar to wfsh keys), kill it (making no assembly current),
+or make it current.
+
+Then I'll do a save/quit key, and be pretty much done with Builder,
+ready to move on to the fun part---the physics simulation.
+
+=============================
+June 14, 2017
+
+first let's do the 'h' Hole stuff,
+then to keep it fun and easy let's do the auxiliary keys
+(shift or ctrl or both + geometric key) to edit Stairs and
+Holes (shift + geo already done for Single---wall and floor)
+
+then move on to the stuff where we have to set current from the cursor touching
+
+
+Okay, 'h' looks good, now let's make shift+geo resize stairs and holes:
+
+plain geo moves whole assembly
+
+shift key resizes main assembly
+ctrl key makes no shift move details, shift resizes details
+
+huh?
+
+plain geo => move assembly (done)
+shift+geo => resize main assembly (hey, check done for stairs---never did this!)
+   no, shift+geo doesn't seem to work on stairs---no, I was not in mode 1, in mode 1,
+   works great, apparently!
+
+ctrl+geo => move inner stuff 
+               Single:  do nothing
+               Hole:  move hole left/right, up/down (nothing for forward/back keys---hole always goes through)
+               Stairs:  do nothing---stairs are very regular
+
+ctrl+shift+geo => resize inner stuff
+                    Stairs:  change step depth, width, height (are two ways to change step width---one is
+                                shift+up/down, changes step width of all steps, ctrl+shift+geo 
+                                 changes each individual step)
+                    Hole:  change width, height (not thickness) of hole
+                    Single:  nothing
+
+Dang it, ctrl+left is intercepted by op. sys., others probably too, so...
+
+plain and shift geo's seems to work,
+  let's use shift + printable to do the various specialized tasks:
+
+    L, R, U, D:  move hole left/right/up/down
+    W, N, S, T:  resize hole or individual step sizes (width of steps changed by shift+geo)
+
+finish this stuff, then install saving (let's say hit ESC, does save and quits),
+then on to detecting who cursor is touching, close to done with Builder
+
+So, next is resizing keys---
+  okay, good.
+
+Next, install ESC:  yes!
+
+Okay, when I resume, I'll install the fancier features---when hit x, delete, or .,
+first the first assembly in the editable list that has the center of the cursor
+touching it will be made current.  Then, for delete that assembly will be removed;
+for x, a copy of that assembly will be added, centered at the cursor and will become
+current, and for ., nothing further happens, but the new current assembly can be
+worked on.
+
+Once these features are installed, I will make a decent world, maybe refine behavior of
+Builder, and be ready to move on to Game.
+
+Initial features of Game will be:
+  first person perspective (camera above and a little behind the player)
+  player block (all assemblies get converted into blocks at load time)
+  can be turned by left and right arrow keys, up arrow gives speed moving forward,
+  down arrow stops (so to look around, stop and turn about, then move on.
+  [ and ] will tilt the camera so can peer up and down (so left and right control
+  azimuth. [] control altitude)
+
+  will have Player, Treasure, and Monster blocks.  Initially, player moves under
+interactive control, consume treasure, die if touch monster.  Hard part is the
+physics simulation, including gravity.  Player can also die if hits something too
+hard.  There will be falling, and hopping (perhaps with digit keys?), and being
+supported.  
+
+Later will allow Player to shoot, and make the Monsters smarter.  Also put in
+sliding door assemblies that can be programmed (perhaps by going into data file
+and modifying numbers relating to time it takes for things to happen).
+
+Philosophy throughout will be that it's okay to make them do some text editing to
+change some things.
+
+So, yay!  It will actually be pretty fun, I think.
+
+I might, actually, make it a two-person duel, use two separate sets of controlling keys,
+just have fun finding way around the building, outsmarting the other person, without needing
+to make Monsters smarter.  
+
+Hopping will be a new fun thing---by adjusting the impulse applied by hitting a digit
+key---again, by editing the source code---will be able to allow crazy jumping onto
+platforms---can become fun just to learn how to get from one place to another.
+
+I would really like to allow for player (and monsters, I suppose) to be carried by
+a block, like a rising and falling platform.  Would be cool to have elevator blocks
+and door blocks notice when they are touched by a player and start their motion---either
+sliding sideways out of the way, or either rising or falling smoothly while carrying the
+player?
+
+=============================
+June 17, 2017
+
+Okay, want to do x and k --- both require searching editable for
+current assembly--- let's write that first, then in Builder to
+use it---
+
+
+As predicted, I'm now better able to see how things should work.
+I want all keys that affect current to begin by searching editable,
+setting current.  Or, not.  Each time we make a new assembly or
+modify current one, cursor stays on the guy, so really maybe only
+moving the cursor should attempt to find assembly the cursor is
+on?  Needs more playing with, but we're looking really good, I
+think.  Have to do 'x' still---just saves thinking about what
+kind of assembly is current, really.
+
+I'm thinking of changing cursor to have octahedra, come to 6
+points, at a farther distance from center.  Will be just a little
+work, will look better (and emphasize that cursor is special, not
+a real boxy thing in the world).
+
+Brief break to deliver mail, half hour walk.
+
+=============================
+June 20, 2017
+
+Okay, here's the deal---I need to carefully design
+the interactions:
+
+movement keys move the camera or the cursor,
+and when moving the cursor, may move the assembly the
+cursor is attached to.
+
+Let's draw a FA for the keys---nah, just code it
+(FA not that helpful for 3D situation---have
+mode, key, current)
+
+Okay, I've refactored the heck out of it, now need to
+test and fix---
+
+looking good!
+
+Remember to put in keys to inner edit stairs to have more
+or fewer steps, and make pointy, bigger cursor,
+and 'x' key
+
+But what should I do first?  Doesn't matter, let's do
+the Stairs---what keys?  For sure Upper Case, like
+M or F?
+
+Okay, let's do 'x' now, then pointy cursor, then more
+testing, approaching done (as I define that, not as
+someone like, say, Jody defines it!).
+
+
+Idea:  have a key that puts the cursor at ground level
+in center of camera region?
+
+Actually, as I play with Builder some, will probably find
+things I want.  Would like mouse location of cursor on an
+editable assembly that is on the line of sight from camera
+location to mouse location.
+
+
+Okay, before doing anything else, let's change Cursor to
+have 6 octahedra, bigger---
+
+okay, when resume, make Cursor.a bigger, and debug the
+triangles to make it a lovely "star" in 3D space, and
+then we'll do some mousery, play with it a while, and
+be done with first draft of Builder---then on to
+physics and the actual Game!
+
+=============================
+June 24, 2017
+
+cursor is lovely, things looking good, next let's implement
+mouse click leading to cursor moving to front assembly
+that is touched by the ray from camera location to
+mouse point on view plane.
+
+When resume, trace ray in Builder/mouse release from camera
+to hit point, etc., so can use mouse to move cursor to a 
+chosen point.  Hey, I just had the thought that after checking
+whether any editable gets hit by the ray, could do same for
+sky blocks and ground block, so can move to those, also,
+and so something always happens.
+
+Could maybe have a key that swaps positions of the camera and
+the cursor, and reorients the camera so that it is aimed right
+at the cursor?  Maybe not!
+
+Next week I have to bite the bullet and start on physics and
+Game play!
+
+=============================
+June 26, 2017
+
+Start with Liang-Barsky and mouse clicking cursor---
+
+Freaky, it seems to be working great!  Startling and weird,
+that the drafty code I wrote works right off the bat?!
+  I did unit test AABB a little, surprising thing is that
+the other stuff to use it is working, apparently, so well.
+
+When we mouse to another assembly, need to make it current
+and change mode to 1, I believe---most likely want to grab
+the assembly we click, so let's do that---
+
+Okay, now I feel both worse and better---have found situations
+(when I moved the camera) where doesn't seem to work.
+I'm wondering if there's some assembly in the way?
+
+Now I'm afraid I jinxed myself---you know, a hubris sort of
+situation.  I need to make a world with just one wall,
+well placed camera, print out hitPoint, dig in to see what's
+going wrong (obvious clicks on a wall registering as a miss,
+somehow?).
+
+Ha!  When I computed "r" --- vector to the right, equal to
+toCenter X zAxis, I was assuming it was normalized, which of
+course it isn't.  When add in code to normalize it, maybe
+it works better.
+
+Had thought just now that I should place the cursor at the
+hitPoint, verify that it hits the mouse?  Because I think I
+was having a bad hitPoint, which often still hit the correct
+point, but let's visually verify---easy---just stub it so
+cursor gets moved to hitPoint---and stub in factor so is
+not on the viewplane---
+  checks out---cursor is right where the mouse is.
+
+
+Now let's go back to system testing---
+  resume with more system testing---actually build a cool
+castle of sorts, while continuing to refine the Builder app.
+I think some of the keys go the wrong way---shift+geo should
+resize in the direction, maybe doesn't do that now?
+
+=============================
+June 27, 2017
+
+Before system testing, let's examine the "grain" issue---I think
+we want arrow keys to always go in the same direction, meaning
+like shift+left makes smaller in the x direction, etc.
+
+Verify this, fix if not so, then make sure that things are always
+set up so grain of things always the same (when looking down a
+hall, for example, we'll see, say, the "along x" texture, at end
+of hall want to see the "along y" texture so it stands out,
+but if not careful, might have built it and rotated it so it has
+the "along x" texture running the wrong way.
+
+Change to be mouse press, not release, because is more natural,
+though hardly matters.
+
+Add in a Door assembly, which is similar to a window, but has
+to be open from some point to the bottom, and later we will want
+to add this cool feature:
+  the hole fills and empties in some algorithmic way
+   (in data file, put "programming" to say whether:
+        open  (means door never fills---also use as default
+               in Builder, can be manually edited as below to
+               activate Door features)
+        closed (means door never empties---might be useful in a stubby
+              way to test a game without opening up the door, then
+              later change to some other style)
+        repeat <followed by numbers saying how long to wait at the
+                beginning before starting the cycle, how long to
+                be empty, how long to be full>
+        key <followed by key number that unlocks the door, and
+             parameters specifying whether it stays empty, or
+             how long to wait before closing>
+   )
+The idea is on a time step where the door wants to close, check for
+whether there is anybody blocking the door, and if so, don't add the
+door on this time step.
+
+  Note that this is different from RB, where doors are "sliding boxes"
+that are very problematic, keep smacking blocks and sending them
+flying at high velocity (students actually like this bug/feature a lot,
+we should note).  I want to have "pushing and lifting" in the physics
+engine, programmable in the same way doors are (i.e., go into the
+world file and directly edit information).  There will have to be
+some sort of velocity matching, where a platform (generally a sliding
+box, in data file say what direction, velocity, timing info).  I may
+not actually do this now, but would be good to keep in mind, while
+crafting the physics simulation.
+
+I'll put in the data file id numbers for every assembly, add feature
+so that when you attach the cursor to an assembly, its id number
+is displayed, along with other info, when touch it, so can know which
+assembly to edit.
+
+  A key feature here is that assemblies in Builder have id numbers and
+  detailed feature lines, but when Game starts, all assemblies are
+  broken down into individual blocks, which must be able to implement
+  the behaviors of the assemblies.  I'll keep it simple:  the lively
+  part of a door is the door block itself, which implements all the
+  behavior without knowing or caring whether there's any framing 
+  blocks (there will be, but door doesn't care).  So, a "door" kind
+  of block is one that pops into and out of reality on a schedule,
+  checking that there's no other block in the way before popping in.
+
+  Hey, interesting, every mobile block in principal could go through
+  a Gate and take on this behavior.  So, a Gate is a kind of block
+  that when you touch it, you get told by the gate where to pop 
+  back in and then you get removed and put in another list of
+  blocks, the ones waiting to pop back in to reality.
+
+  The point is, if I want to have Gates, then Doors are going to be
+  almost free, in terms of physics simulation.
+
+So, add Door, and assembly id numbers
+
+I will come back later and add in a bunch of special Single type
+assemblies, namely gate, pusher, treasure, trophy (that's what the
+kids call the "grail"), ammo, food, ...).  Oh yes, though not
+added in Builder, bullet.  Ooh, add to the list for Builder:
+monster (maybe several kinds) and factory (both these can be
+programmed in the world file).
+
+Interesting that I went to so much work in RB2 to make the little
+control panels for each kind of block, now I'm going to cheap out
+and make them type stuff in the data file.  This will actually
+give them some flavor of programming, but will probably be a mild
+nightmare (but as long as I provide defaults, should be good, only
+ones who get it will try to edit).
+
+I'm thinking I should make the data file readable, like
+
+door
+x y z   location
+sx sy sz  size
+style=open       which they can change to (secons are the units):  
+
+            style=repeat start=closed after=10 closed=30 open=20
+
+              meaning start closed, 
+              wait 10 seconds, disappear for 20 seconds,
+              come back and after do, stay for 30 seconds,
+              and so on
+
+I was just thinking, we could just make this kind of block as a
+stand-alone guy, but I think for now the Door is a good idea---
+can make the door almost as large as the frame, but having the
+frame and the opening makes it clear what's going on.
+
+Looking at what I've been thinking, I'm hoping to ultimately make
+this have everything RB2 has, plus the niceness.
+
+I think I will try to identify the features we need (ability to
+disappear, ability to reappear, both with timing and checking, etc.
+
+Eventually I'd like to give each block a triangle mesh for its
+appearance (wall, floor, stairs already have them, note), to make
+things look cooler.  But, not this summer!  For short term, I'll
+be lucky to get it working with just simple meshes for the various
+things that have an orientation (player, monster(s)).
+
+I need to be thoughtful, implement some decent stuff, but have
+engine make it fairly easy to improve later.
+
+When that's cleaned up, do system testing, then on to physics!
+
+I do think that just building the world will be way more fun and
+challenging, in a sense, than in RB2.  Most kids don't make very
+good 2D worlds, I'm hoping the 3D immersiveness will suck them
+in better.
+
+Remember, this is mostly an exercise for me (for 3510 and Rigid
+Body Simulation (should be able to use all the previous stuff
+to add in rotation, impulses, and such---the AAB world is the
+easiest place to get plausible physics working (recalling that
+RB2 is fundamentally a cheat---each block gets its turn to
+act, which is not at all how reality works)).
+
+I really like the new Cursor and mousing to place it.
+I'm still a little unhappy with the Camera.  Maybe I could
+use mouse movement to control the camera more naturally?
+A problem that occurs to me is that if we made moving the
+mouse rotate the camera in some way, that would conflict with
+clicking to place the cursor (unless we used 1,2,3 still---if
+mode 1, mouse only clicks, if 2, only click the cursor, if
+3, motion rotates very quickly (still use azimuth and altitude,
+with change in mouse location left-right changing azimuth, 
+up-down doing altitude---really would just be a nicer form of
+input, instead of hitting keys.  I may just try to do this!)
+One problem is the physical mouse getting in a bad place---have
+to learn to pick it up and move it back periodically, not so
+bad.  
+
+In Game, I could use the mouse to turn left/right, to look up/down,
+button to toggle stop/start, still hit [space] to fire, and other
+things
+
+I could also, when 3 is hit, turn on the nasty mouse cursor location
+freezing, where it doesn't actually move, or show up in the window,
+for that matter.  I forget why I didn't like the mouse control back
+in the day, but I clearly remember having it, using the good old
+Robot class.
+
+I think mouse control is worth spending time on, because it will
+improve the user experience a fair amount.  Might end up 
+sacrificing more game features, but probably worth it, because
+if it's hard to edit/play, is less appealing.  I guess now is the
+time to do it.
+
+Okay, let's get to it---
+
+when resume, try to debug the hole---when appears to not touch the
+top, won't let me lower it?
+
+Then do Door, forget idea of mouse control, for now, not sure about
+where id's are working.  Door will have a detail line---others don't.
+
+
+=============================
+June 28, 2017
+
+First I have to figure out how to make situation where the
+hole improperly won't go down, then debug it---
+
+First, though, need to fix the "kind" problem---the problem
+is, I started with blocks, when moved to assemblies, tried to
+use "single" to represent lots of guys.
+
+I've got it set up where Builder reads the kind, if it's one
+of the single block assemblies (actually if it's not one of the
+multis), pass that word, like sky or ground or wall or floor
+(or later lots of others:  player, bullet, ... )
+really any assembly that only has one block in it.
+We pass the Block kind through to the single guy, and assign
+an id to the Single assembly, not the block---
+
+Okay, I think the id's are correct---let's try killing some,
+check that out---looks good, leaving gaps, but that's fine,
+is just for manually editing details
+(have to use console display to see id, then search for it
+in world file---if needed, preface by like  "door 317")
+
+Oops, suddenly feeling overwhelmed, thinking of all the RB2
+features I want to implement, but after fixing Hole bug and
+doing Door, it must be "on to physics" and going minimalist---
+I'd rather like to try this out in SSI 3, rather than not
+until SSI 4.
+
+Okay, let's try to recover the alleged Hole bug---
+  can't---remember this, and when it happens again, try to 
+  notice how it's happening so I can come back to it.
+
+So, now we're adding a Door---similar to Hole for now, but
+in Game, a block to fill the hole (with different texture)
+will pop in and out, as programmed by the details line
+
+After Door, let's change Block to use inheritance, getting
+ready for radically different Explorer and Wall blocks,
+for example.
+
+Okay, Door looking good.
+Hmmm, to use inheritance on blocks, classes will be
+like
+  Wall (piece of solid stone, really not bright at all,
+        never changes)
+  Explorer (lots of features, including, note, ability
+     to have time (step number) at which willing to
+     try to come back into reality)
+
+  Door (special look for a wooden door, has ability to
+     do various styles of leaving reality and returning)
+
+
+I'm going to try to make as abstract as possible, in the
+sense that I'll have a list of blocks that have left reality
+and have timing info for coming back in---the Game will
+scan this list (wantToEnterReality) each step, check time
+info against current frame number, and check broad and narrow
+collision info to see if is allowed to return because there's
+nothing in the way.  This framework will allow lots of different
+block behaviors, without doing special code.  Want overlap
+wherever possible, in the sense that a Door wanting to
+come in will just need to have some timing info, Game will
+do the rest, with Door behave method checking timing info
+to decide whether should put in a request to leave reality.
+
+The point here is that RB2 is pretty grungy, maybe this time
+around I'll be able to recognize issues and make things more
+solid and easy.
+
+Okay, let's inheritanceize Block, make sure still works.
+Idea here is that Assemblies will trivially turn into
+loose collection of blocks (except some are tricky, like
+Factory assembly produces special kind of block that ...
+and DoorFrame assembly will produce 3 Wall instances, plus
+a Door block that pops in and out of reality.
+
+Here's the need for careful, thoughtful abstraction:  do I
+put everybody in a list, like Factory, scan that list for
+behaviors, also use it for physics, and ignore Factory
+blocks for physics---don't even put into broad phase,
+so will never report a possible collision.  Other cases,
+like Bullet, goes all the way through broad phase, get
+to narrow with Bullet and Explorer, to realize, hey, that's
+my Bullet, so no collision.
+
+The problem is, there are lots of little issues that are
+hard to spot ahead of time.  The proper abstraction here
+is "some blocks that you might think should collide actually
+don't."  
+
+As an example of badness, I never have been able (with the
+time I've had when I tried) to figure out why explorers in
+RB2 lose their little yellow border when they go through
+a Gate!  
+
+Good abstraction is what I finally ended up with in terms
+of collision responses:
+  consume (when I touch this other block, it disappears instantly)
+  die (when I touch this other block, I disappear, perhaps with a show)
+  kill (when I touch this other block, it disappears, perhaps with a show)
+  dieKill (when we touch, we both disappear)
+
+I should be able to look at RB2 to remember some of the issues,
+perhaps do a better job (cleaner, anyway) this time around.
+
+Okay, with that pep talk in mind, let's inheritanceize---  
+  first, change Door to DoorFrame so Door can be a block extension.
+Wall, Floor, Stairs (where Stair is a kind of block.  Note that
+we have to have separate classes for all kinds of blocks that
+are basically inert, but have different texture maps for 
+visual niceness).
+
+Well, have been refactoring to use inheritance in Block, when
+resume, figure out what's going wrong with texScales---SkyBox
+(probably because is first) doesn't seem to have it?!
+
+It's a little weird---Block gives every extension class instance
+variables textures and texScales, which are then supposed to be
+initialized in each constructor to be the static arrays, for
+some reason is not working.
+
+  Maybe a problem with doing like textures = SkyBox.textures,
+  just use different names for IV and SV, I'll bet!
+
+=============================
+June 29, 2017
+
+A thought:  I need to package NewSSI to have LWJGL and j embedded in the
+folder so one zip file can be downloaded, put on Desktop, and have it
+work.  I need to do this today, try it out tomorrow in CN 101.  If this
+doesn't work for some reason (the only issue I know of is moving from
+Retina display to regular---will have to change two numbers, somewhere,
+I believe), I will know to stop fretting about getting RB3 done for
+4th session.
+
+I am being pessimistic about the physics stuff, but really, with AAB's,
+should not be so bad.  Will be the first time I've tried to implement
+continuous collision detection with lots of bodies moving.
+One thing I can do is try for support---at start of simulation step,
+try to apply gravity to each mobile block, first checking whether
+the space directly below the block (an AAB that is immediately below
+the block under consideration, with a small z dimension---like the
+collision tolerance downward) has anything in it---using broad
+phase.  If there are any blocks there, check directly whether the
+active block is supported by any block.  If so, simply don't
+give it that little change in velocity due to gravity for the step.
+
+Also, why not see if any of those supporting blocks have upward
+velocity and are of kind platform, in which case we could give
+the active block the same velocity upward (the idea is to allow
+for elevator block that follows a set periodic travel plan,
+and will carry up or down an mobile block).  Offhand it seems
+possible, if pathological situations are avoided.  The idea is
+that if support works to avoid dropping, change it a little to
+allow rising.  What about dropping, though?  If is in contact
+below with an elevator block that is moving down, could just
+match the velocities, but have to be aware always of possibility
+of multiple underneath contacts (could be being carried downward
+on an elevator block, but sticking out over its edge, hit a
+nearby block.
+
+The overall plan is to look at the world as frozen, let all blocks
+behave in the sense of adjusting their velocities, then check
+for these special velocity adjustments.  Once everybody has their
+desired velocity for the next step, then we launch into the
+full-blown collision stuff---do broad phase with new velocities
+(which makes the swept cells different), find pairs, advance
+time in little increments, until next collision, adjust velocities,
+until everyone has moved for full time step.
+  Is somewhat complicated, but should be pretty elegant, robust,
+I hope.  There are subtle issues, involving multiple collisions,
+will need to kludge out of those in some way.  Like, a block
+going precisely into a corner, where it hits two blocks at very
+nearly the same time---should probably notice and just stop it,
+or something.  I feel like Erleben might have an algorithm for
+this, the one he says is "good enough for games," should look
+at it.  In this sort of situation, the moving block might require
+a number of tiny steps to move for the full time, could slow down
+the simulation unacceptably (I hope that my steps involve delaying
+to hit the target time, if the work doesn't take the full time,
+and comfortably going more slowly if the work for a step takes
+too long.  I looked at Basic, and I think that's set up properly,
+at least I tried to (and stole it from someone more thoughtful than
+me).
+
+The core part of all this is the broad phase stuff, and the
+ability to answer the question "given these two blocks with
+their velocities, at exactly what time will their collision
+envelopes overlap (I'll want to use the idea of trying to
+get, with full-precision computations, so that they are
+exactly collision tolerance apart, so with rounding error
+they will actually be safely apart (whereas if we tried to
+get them with their borders exactly touching, with rounding
+error they'd be either a tiny bit apart or a tiny bit 
+overlapping, the latter being deadly for the logic of two
+non-overlapping boxes moving toward each other).
+
+For broad phase, it occurs to me that I could cheap out and
+use a 3D array, say 20 by 20 by 20, with each 10 by 10 by 10
+cell holding a list of all the blocks that are touching that
+volume of space.  This would be like 8000 lists, but would
+be pretty quick and easy to work with, as compared to
+hash table technique.  Maybe---might not save that much work
+versus the hash table, which I've already mostly implemented
+correctly, in RB2.  
+
+Okay, onward---next step is to debug current Builder stuff---
+
+okay, looking good, let's move on---first thing, I guess, is
+to read world file and produce proper list of blocks---
+proper means separate into mobile and fixed---
+as I do each part of this, I should look at RB2 for guidance.
+
+First thing I notice is Zone---for now, let's only do one
+reality, no levels (is not that interesting, from my 
+standpoint).
+
+Next see Camera---I guess I will have a separate camera,
+or even several, on each step as explorer possibly moves,
+reset camera to follow properly.  Or, at a keystroke have
+a 3rd person view of the game, controllable like in Builder,
+say.  Hmmm, I guess 1 will use first person camera attached
+to current explorer, 3 will switch to 3rd person (hey,
+serendipity---1 and 3---I totally wasn't thinking of that
+when I used those keys in Builder!)
+
+In 3rd person, geo keys adjust the camera just like in Builder,
+while in 1st person, geo keys turn the explorer, go, stop,
+space bar will jump, shift key(s) will jump
+
+Obviously after getting loading working, and adding an
+Explorer class, I need to make it so the camera stuff is
+working.
+
+Explorer draw will override Block.draw, will use cursor-like
+point sticking out to the front, but mostly within the
+bounding box, 1st person view will be so that the
+gun is visible, and that's probably all.  I can adjust that
+later, of course.
+
+Once that stuff is done, I'll be able to drive around in the
+world, ignoring physics completely (put in a stub update
+that just keeps moving forward unless stopped).
+
+Then can worry about making the explorer not go through
+walls, and gravity
+
+Note that there will be a max velocity (achieved by falling---
+hitting up will not give a speed where hitting a wall is
+deadly) such that the explorer dies (for now I'll use
+sound effects for like, ooof when hits ground and dies,
+others for events---even like running into a wall, firing,
+bullet exploding when hits something, monster scream when
+shot, etc.  As long as I keep them short, sound effects are
+cool, I think.
+
+collTol is already there, is probably way too big...
+
+Just made a harsh decision to forget name of input file
+once loaded, and to never save the game (don't have in
+RB2 and probably won't want)
+
+Stubby decision---use cursor textures for the six faces
+of the explorer---but add in rotation through an angle
+to the vertices so camera3 can see the orientation
+(note that in Game, can only "see the orientation"
+in 1st person by seeing what you see!)
+
+I'm thinking the draw will rotate, but the block will
+just be like 2 by 2 by 6 box, will be very little error
+between the box and what it looks like, so player won't
+be bothered by discrepancy.
+
+Hey, let's use special textures for player surfaces---just
+one, actually.  Someday (make 3510 students do it for practice
+with mesh modeling?) will have nice image mesh for
+Explorer, Monster, etc., but for now, just use a bright
+color for player---maybe gold
+
+Hmmm, I need to add Explorer to Builder, I guess?  Is quickest
+way to see it, and the way I'm used to adding multiple
+lives---but not the easiest---I'm thinking using a spawn
+point is better, just notice when the player dies,
+spawn another and continue?
+
+Need to be able to make jpeg's for signs, like play again?
+you lose, you win.  For now, I'll not do this.
+So, can't put explorer in the world, will have to wait a
+bit to see in 3D in Game---
+
+Have to teach them, after done building world,
+put cursor where you want new Explorers to spawn, hit ESC
+
+Okay, I've got some of the framework, let's do the
+Assembly method that takes current list of blocks
+and adds the ones generated by this assembly
+
+Running smack into some deep complexity with door---must
+add in Builder feature that all DoorFrame assemblies
+have the details line "open", then after building,
+game author edits world file, puts in whatever for
+details line, then Game loads all the assemblies, and
+when it loads a door kind, Door class snugs away the
+details in its special instance variables
+
+What a mess!  When interactively build door frames,
+always open, but can edit the world file and
+have it closed, even in Builder, and in Game,
+will be able to do repeat
+
+Onward, was too detailed for this point, but I
+was worried about this stuff.  Oh, wait, Door
+has a special texture, want dark brown grain---
+
+I think, somehow, I'm running into problems I didn't
+realize before with moving to inheritance.  Now when
+I hit 'w' it works, but 'x' or 'w' again crashes,
+I think in Single we have to be better---
+
+Okay, time for writing, when resume, Friday morning,
+get folder ready for transport to campus---
+
+=============================
+June 30, 2017
+
+Okay, Builder seems to be working, let's do the
+transport (when resume development, I'll continue
+with plan of getting Game to allow driving the
+player around, using camera1, camera3, everything
+except physics (player will update, might toss
+in gravity at this point).
+
+=============================
+July 1, 2017
+
+Okay, fixed the localized "j", and debugged a little
+on Hole where the hole was losing framing, so should
+be good.
+
+Okay, on to Game---let's make an elegant world, place
+cursor where spawns, use camera3---
+
+Cool, seeing some stuff in Game, let's fix while thinking about
+it the closed Door, should be dark wood grain, not wall material,
+and is wrong size---
+  (just now thinking should process the details line with a
+   little loop that looks for pairs like style: repeat,
+   process in any order, including like key: 37
+   Set all Door properties to defaults, only change if one
+   occurs 
+   (this is back to the readability issue, also realizing there
+    could be a lot of attributes)
+  )
+
+Definitely need to work on textures some more---at a minimum,
+I need 2 scale numbers per rectangular face, maybe more, to
+specify how the image should be mapped to a physical rectangle,
+assuming a typical size of the face...I don't need to do this
+yet, or ever, would just look better.
+
+I'm cheered up a little about this project, seeing the explorer
+(a rather non-descript yellowish box) in the scene.
+
+Next let's implement the update for all the mobile blocks, which 
+will just be the player for now.  Was just thinking that I need
+to set up Basic to call processInput, behave, update, display,
+in correct order, for desired physics simulation and user-interaction.
+"update" will include a lot of work, checking for resting collisions,
+adding gravity, and so on.  This is the big payoff, really, giving
+me a chance to try out some physics simulation, which I've never
+actually done to this extent (never done gravity or resting contacts).
+
+For now, though, let's verify what I've got so far by adding in
+a simple turning, tilting of player, start, stop...
+  with angle and speed for now, and update position at each step---
+
+Hmmm, I seem to be rather frightened of the next part, namely
+finally doing the physics and all.  First thing is to try to
+figure out the order of things.  How about:
+
+display (can think of this as first or last---the point is, once
+         per simulation step, we show the user what the world
+         looks like at that moment)
+
+processInputs  (user gets first chance to change things, notably
+                velocity of explorer (can turn a little, start, stop,
+                ask for bullet to be fired.  Some of these things
+                can be done immediately, but others---firing a bullet---
+                involve putting in a request which will be done later
+                (the point is that...hey, we can simply add the bullet
+                 to the mobile list, with correct velocity, but do
+     this through the scheme for all additions, which is protected by
+     checking that there is no overlap where wants to go in, and either
+     dieing, killing, or waiting)
+
+behave   (mobile blocks have a chance to change their properties algorithmically,
+          similar to under user control, but done by the block's limited AI)
+    Blocks may want to use collision info, visual simulation, to decide
+    how to behave (I'd like to make Monsters smarter, somehow).  
+
+update velocities due to gravity (all mobile blocks are checked to see whether
+    they are supported---have a block directly beneath, even a sliver, and if
+    so, they don't get a little chunk of downward velocity added, and if they
+    aren't supported, they do get that little downward impulse, unless they
+    are flying or floating or any special effect like that.  I suppose this
+    is where we would put in pushing/lifting if we were going to, maybe later.
+    Idea is if you're on top of a rising platform block, could get matching
+    upward velocity, so in the absence of some collision, they would travel
+    upward together.  Heck, let's try to do this, because it would be really
+    fun to have capability to put elevator blocks in.  Would have a detail
+    line specifying distance to travel upward, times, like a door, to wait
+    at the beginning once, time to travel up, time to pause at top, time to
+    travel down, time to pause at bottom (definitely need to implement the
+    attribute: value style to make these features doable).
+
+step   (all mobile blocks find out time within standard time step that they
+        will collide with one or more other blocks, using broad phase for
+        efficiency, advance everybody for that amount of time, apply suitable
+        impulses to ones that hit, roughly, within that amount of time, and
+        repeat until everybody has advanced for full time step.
+        Oh, and of course, upon collision, in addition to applying impulses,
+        sometimes blocks leave completely, or do some other action.
+        For example, when an explorer collides with a door, the explorer
+        comes to a stop, and depending on the door attributes (is it locked)
+        and whether the explorer holds the correct number key, door might
+        disappear (going into list of guys maybe wanting to come into reality)
+   When an explorer or monster or such collides from the top with a platform,
+      its velocity is set to match the platform's (like it sticks to it).
+   All this is kind of complicated, need nice organization and abstraction.
+    Also, broad phase updating is mixed in here.
+
+I'm pinning lots of my hopes on idea that the core part of step is being
+able to say at exactly what time two blocks will first touch, hoping this
+will be doable because we have axis-aligned boxes with linear velocities
+(much fancier with arbitrary rotating polyhedra---but the cool thing about
+this project is that by plugging in fancier tools, can, say in rigid body
+simulation next spring (if I decide to teach it), do better game engine.
+Nice to try it out where the CCD is easy and there's not rotation before
+tackling the real thing.
+
+Let's spend the last 25 minutes of work today thinking about this special
+easy CCD---
+  first idea is use net velocity---can in essence treat A as moving, B
+  as stationary, call v the velocity of A.
+
+Thinking kind of Liang-Barskyish here---
+
+Hmmm, actually, I think a key idea is to do x and y separately
+(and z too, duh---I was not picturing that at all).
+Hmmm, really is Liang-Barskyish---except instead of doing a single
+point with velocity against box B, we worry about faces.
+
+We can basically determine time interval over which right face of A...
+
+Look, if A.x + A.sx  < B.x - B.sx, then A might hit B, and we can easily
+compute exactly when.  
+
+Look, can't we figure the time that a face of A will touch the plane of
+a face of B in that axis---x, y, and z---and do this for all three axes,
+and figure out what's going on from those three numbers?  I think so.
+Are just a ton of faces, really, some elegance might save bother.
+
+Think separating axes, I think.
+
+=============================
+	July 3, 2017
+
+	Have, I think, a pretty slick CCD for AAB's.  Now I'm daunted at all
+	the cases, how many unit tests I really should do.  Actually, I think
+	moving on to horizontal traveling explorer with other blocks, top
+	view, should be a good test---just drive that sucker around a lot,
+	you know, with collision handling being to stop when hit something.
+
+	Will stub in, let's do it.  I'm fully expecting, of course, to
+	need to come back and unit test in Block.main.
+
+	At least until it fails, let's stick with Basic's 
+	display, processInputs, update --- put physics stuff, and
+	behave, in update---for now, just advance player one velocity
+	unit per step, then I'll add in collision detection and handling---
+
+	Kind of comical---have cameras screwed up somehow, camera1 not
+	used until...
+	  fixed, looking pretty darned good!
+	   (I do wonder if camera should be wider angle?)
+
+	Okay, now let's go for it---put in stubby code (no broadphase)
+	to do narrow phase with player and all fixed blocks, test out
+	the CCD---
+
+	ha!  had top and bottom switched in the early exit code---
+
+	As much as I can tell, CCD is good, except, of course, after
+	stopping and setting the velocity to 0, then turn away and hit
+	up, get NaN, won't pull away.   
+
+	Okay, I added in a feature that says, after regularizing,
+	if B is within collTol/2 of outside (to left or below) the
+	region v can hit, call it a miss.  If we always stop blocks
+	when they are collTol apart, modulo rounding error, this
+	will work (if blocks are, say, started a smidge apart, this
+	can probably cause a bad miss, but not too bad (happens with
+	RB2 when the student creates blocks that are touching---they
+	go right through each other.  Same thing holds here, except
+	if collTol/2 overlap, will see same as a real overlap).
+
+	I was going to not do writing for next three weeks, spend
+	time on RB3 to try to get done, which is probably rationalizing
+	fear, but let's do it anyway.
+
+	So, I can work another half hour or so, what to do?
+
+	Let's add in hopping with space bar and gravity, with stubby
+	hopping such that we always get a nice upward component with
+	space bar, even if not supported (in actual game, of course,
+	space-barring without support will be ignored, in processInputs)
+
+	Okay, kind of cool, lots of little bugs.  I'm making pretty
+	good progress, I think (knock on wood!).  Maybe next thing is
+	to add in checking for support.  One cool mostly accidental
+	thing is that sometimes when collide with a wall, just slides
+	down it under gravitational acceleration.
+
+	Is a design question---do we bounce off of walls, like in RB2,
+	or stop?  
+
+	Have support issue to implement, probably lots of glitches with
+	CCD and gravity and hopping, and the I hope straightforward work
+	of broad phase.  Might soon have ability to have an Explorer 
+	that player can drive through the world, including going up and
+	down stairs.  Then can add Monsters, shooting, Treasure, Ammo,
+and so on, mostly pretty easily, I think.
+=============================
+July 11, 2017
+
+Post-surgery---what now?
+
+Let's think about adding support---
+hmmm, doesn't seem hard
+
+resume:  broad phase, go for it!
+
+=============================
+July 13, 2017
+
+Let's start broad phase.
+Start by looking at CellTable, Node
+
+Okay, have update roughed out, when
+resume, ponder further and implement
+(point is to realize what methods CellTable
+needs)
+
+=============================
+July 18, 2017
+
+Okay, just relaxedly proceeding on this little project,
+working on broad phase and the updating---
+
+I think CellTable stuff can simply be "register some
+blocks with some AABB---might just be itself, or might
+include downward fluffing for gravity (to see if supported),
+or might include swept volume.  Once registered, we can
+scan a list of mobile blocks and gather list of colliding
+pairs, and that's it, I think.
+
+Going through the outline:
+
+  once and for all build tableF, right after create fixed
+
+  for supporting, need to register all mobiles as stationary,
+  then scan all mobiles with slightly fuzzed bottoms, producing
+  list of all blocks that might support (will be just a few, 
+  by the natural of 3D reality---can't have a huge number of
+  blocks supporting a single smallish mobile block), then have
+  separate method to say whether supported, as soon as find one
+  that supports, stop
+
+     Hmmm, need to be precise about collision tolerance, or I'll
+     have problems.  If, say, a block falls onto another, stops
+     in the collision zone, which is probably [.5collTol,1.5collTol]
+     (actually calculate time to hit to full rounding error, trying
+      to hit exactly collTol apart, but will be somewhat off from that,
+      which is why we use some interval---maybe should be [0.9collTol,1.1collTol],
+      since collTol is vastly greater than rounding error (like 0.001 or such---small
+      enough to be undetectable visually or in physical behavior, but large enough
+      that shooting for .001 apart will lead to being comfortably
+      within [.0009,.0011]
+
+      Fuzzing a block downward by collTol will guarantee that broad phase
+      recognizes them as overlapping, hence supporting.
+
+      I'm thinking that gravity impulse size doesn't matter here, because
+      if supported, it doesn't get added, and if not supported, it does.
+    
+     Hey, I just realized that if a block runs out of time on a step
+     right on the edge of colliding, will have significant downward velocity,
+     and if on next step it is seen as being supported, we won't add gravity,
+     kind of doesn't matter.  I'm nervous about multiple collisions at about
+     the same time, so one, viewed with rounding error as first, advances
+     very closely to collTol apart, while others will be in the envelope,
+     ....
+
+I'm realizing the overall CCD algorithm isn't totally clear to me.
+We'll do broad phase, find several pairs that might collide within remaining
+time, for each pair we'll compute, with rounding error, time until the two
+blocks in the pair are collTol apart, and for all those pairs we'll take
+the smallest time, advance everyone by that much time, and adjust
+velocities of those two winning---earliest colliding---blocks.
+
+   The new thing, perhaps, is to realize that other pairs are within the
+   envelope, and adjust their velocities, too---otherwise the next inner
+   step would expend a tiny time.
+
+It is very important that the CCD be able to recognize non-colliding contacts,
+namely where the velocity is not going to cause penetration.  
+
+This is all fine, I believe.  In terms of broad phase issues, these guys who
+are within the envelope will certainly register as possible collisions, and
+have their times of contact computed, but they'll be big---like, never or
+in a long while, so they won't be very important for the next inner step.
+
+Okay, let's do some CellTable work
+
+When resume, continue intermixing cell table work with update work
+=============================
+
+July 19, 2017
+
+Okay, onward---
+
+Hmmm, seems getAABB should always fuzz by collTol?
+When finding hit times, always try to land two blocks
+exactly collTol apart, so with rounding error, they'll be
+actually [0.9collTol,1.1collTol] apart, so with the
+fuzzing on both, will solidly overlap (unclear as of yet
+how we'll check for overlap, but will be the fuzzed
+AABB's.  Have to clarify these things, of course).
+
+Well, it's getting to be fun, as I feared, going up stairs
+is kind of a pain, need to finish the actual physics stuff
+(as opposed to the stubby version), maybe work on door coming
+in, firing, so can check out the actual physics simulation.
+Need monsters, actually, so can have a lot of mobile blocks
+to really check it out.  
+
+Yes, that will be fun---implement Monster, and firing, see if
+we can get it working with the broad phase stuff.  Actually not
+that far from having a usable game (knock on wood)!
+
+One easy thing---need to implement head turning and tilting,
+just like camera, separate from body, so can sit still and
+look around, or travel one direction while looking off to the
+side.  Migh want to make down arrow move backwards, so when
+run into a wall, can easily back off from it.
+
+When resume, look at this:
+One physics bug:  when run into a wall, player sticks.
+Why isn't gravity dropping to the ground?
+
+=============================
+July 21, 2017
+
+Okay, let's look at why when hit something, player sticks
+instead of dropping humorously down the face.  
+
+Okay, is stubby---doesn't notice velocity is not penetrating.
+Let's move on to implement actual simulator
+
+After considerable pondering, almost feel good about
+refactoring hitTime in Block class---
+
+Resume:  have a lot of debugging to do in the new
+findHitTime--- (wondering if I should keep previous,
+which as far as I know works except for when come in
+contact, computes hit time of 0, and fix that, instead
+of the new version---I was excited about it until I
+realized that all three axes come into play in an
+irritating way!)
+
+=============================
+July 23, 2017
+
+on with findHitTime---stick with the more elegant
+approach, I guess (methods instead of copy and paste)---
+oops, had some bad typos (bl instead of br in cases
+3 and 4)---
+
+Slight non-hubristic celebration:  yay!  The player
+is now hitting a wall and slowly sliding down, as
+desired.  Needs a lot more testing, of course, but
+is encouraging.
+
+Now let's try fancier worlds---
+  world5 is working nicely---actually went up the stairs
+(combination of hopping and starting forward)
+
+Tiny thing---let's make head azimuth and altitude---just
+like camera, namely =- and [] (good thing is that using
+Builder will teach these, will be natural to use in player.
+Let's also put in wider/narrower projection, say with ,. keys?
+
+Then maybe I'll put in firing bullets, shift to actual
+physics simulation (one thing is to not lose x-y plane
+velocity component when hit bottom support---stubby version
+stops dead when hits ground after hopping)
+
+This is getting pretty good!  By next summer, will be
+super cool!  
+
+[sidebar:  will I have to teach a robotics course next
+spring?  Do I want to teach rigid body simulation (has had
+a small audience the last few times, might not be worth it,
+plus the usual concern that I don't really know the material.
+Ironic that if I did that course well next spring, by next
+summer I could have a real physics engine, in the sense of
+not being necessarily axis-aligned boxes.  Even so, this
+work has been valuable because it's a sort of proof of
+concept.  
+
+  I got this computer vision book, found it depressing,
+  but maybe I should pursue it.  I need to find out if
+  Feng or Iliya or someone else wants to teach it before
+  I jump in.  I also need to figure out if I want to---I am
+  intrigued by this aspect of robotics---seems like a huge
+  part of a robot is vision and AI (for autonomous robots,
+  which is the only kind that interests me).  The question
+  is, how much do I care about robotics and AI?
+  Another thing would be to learn modern AI, like how Watson
+  works ("deep neural nets", maybe?).  Again, don't want to
+  struggle with this if someone else is doing it.
+
+  The point is, I'm looking for a rich thing to do for my
+  last six years or so of being a professor---something that
+  will let me publish stuff some (even if only CCSC) and
+  teach popular electives.
+
+  I could also leverage my math background to teach an 
+  elective on technical security---RSA, elliptic curves,
+  stuff like that---stuff that only the most hard-core
+  mathy CS students would want to go near.  I've been teaching
+  game programming to those students, really, security
+  area might be better.
+]
+
+Okay, back to prosaic world of this project---put in
+1st person camera controls, should be easy and fun!
+
+Oops, altitude shouldn't be part of velocity update of
+Explorer---means if looking down, collides with ground
+after a brief time---change this---
+
+Ha!  Let's remodel Explorer to have camera in center of
+top cube of 3, if you will, and slant 4 faces at the
+top from camera down to ground.  I.e., Explorer will be
+a pyramid, will be able to see all the way to the ground!
+Check out cursor to see how this should be done---
+
+When resume, recheck the red pointer triangle in Explorer---
+I think it's somewhat wrong, though it seems close.
+
+More worrisome, seems to be stopping incorrectly while
+simply driving along (one thing I thought was wrong is perhaps
+not, because the slanted sides, visually, look like they're missing
+when the actual AABB hits?  Still, I have for sure observed
+incorrect, stopping way far away from the door (in world5).
+
+Is pretty fun, though, I have to admit.  I think I won't
+put in keys to change projection angle (how fisheyed or not),
+or maybe I should.  It seems that the distance perception is off---
+a block starts filling the view entirely when we're still far
+from it.  Perhaps I just need a different projection angle.
+=============================
+July 25, 2017
+
+okay, need to check the pointer---let's make it somewhat wider, longer---
+I can't swear it's wrong, but looks weird (then worry about bug?)
+
+Looking good (haven't noticed the CCD bug---maybe I was just confused
+with the slanted sides, and the door being off the ground?  Be on alert,
+of course, but carry on).
+
+Next:  add tiny feature---\ to put altitude of camera at 0, like Explorer,
+make shift+various keys move by like 15 degrees instead of 3
+Make =- change camera azimuth, whereas arrow keys rotate body (will have
+to change the rather odd way that I've got Explorer following camera)---
+is nice to be able to travel straight along while looking around, I'd guess.
+
+I was just thinking would be nice to have a flying avatar, like Flyer vs.
+Explorer.  Fine, would be easy to do, I believe.
+
+Stop (down arrow) shouldn't cause stop until supported, similar to hop request
+not being fulfilled until supported.
+
+Might want a single key to do a small hop/forward/stop so that each time we
+hit it, we go neatly up another standard-size step.
+
+Have seen several situations where I thought CCD was wrong, but it wasn't,
+was the door frame being off the ground and the player being slanty-sided,
+so looked off, but wasn't when got to the right perspective.
+
+Let's leave the shifty guys until later, if ever, move on to more interesting
+things.
+
+Actually, though, stop should be fixed now, while I'm aware of it---
+  also, the head turning feature
+(I've got a strange mixed metaphors situation---arrow keys shift camera,
+but turn explorer.  Oh well, is probably unavoidable, people just have
+to learn it)
+
+I'm being a little lazy, a little physics challenged, and leaving so can
+turn while in the air (but can't hop or stop), and, importantly,
+can start?  This is a little wrong, actually, now that I think about it,
+what I've been doing---hit <space>, once get in the air, hit <up> and
+move forward through the air, hmmm.  Is not realistic, but if have
+butted up against a block, only way up is this---any forward velocity
+while in contact stops immediately???!!!
+Wow!  Actually, physical reality says have to do hop plus forward while
+on a step a ways off of a vertical obstacle, so do a legal little
+parabola piece and land on the next step.  For comfort, could bounce
+back a little from obstacles, like vertical face of a step, then when
+hit the special hop+forward key, could be enough horizontal impulse to
+cancel the backwards horizontal, would also be more realistic---when you
+run smack into a wall, or a step, or whatever, you do tend to bounce off
+of it, a little.  Hmmm.
+  Have to refactor, I'm afraid, so that start, stop, turn, hop, hop+start,
+all are buffered, attempt to fulfill only at the point where we know that
+the block is supported---if not supported, you're in the air, can't do
+anything except fire your weapon, and turn your head, I guess.  
+So, let's fix that.  Let's make <space> do the stair-climbing move---diagonal
+impulse, and <shift>+<space> do pure vertical, for now at least.
+
+Only buffer one request---when reach ground, will instantly kick in (so if
+time it correctly, can do a sequence of diagonal impulses, requested roughly
+while in the air, fire when touch the horizontal of the step, well away
+from the vertical, not too fussy, I hope.  
+
+Okay, I've pondered this deeply, decided to go for it, be as realistic
+as we can.  At worst, need a key that will cause player to back up gently
+so can get away from a vertical step front so as to be able to hop it.
+
+Okay, is looking pretty nice, but as predicted, keep slamming into step
+verticals when try to climb, so need to adjust diag hop amounts.
+
+Once this is spiffed a little, let's start adding in harder features, and
+move away from stub physics to actual simulation.
+
+When resume, I need to get my values correct:  assuming 1 unit is 1 foot,
+game area is 200 feet across, figure what horizontal speed should be to
+simulate a brisk walk (how people walk in a dangerous area), then figure
+an appropriate gravity value, start with real gravity on earth, maybe 
+adjust from there.
+
+Once have this, try to make diagonal hop lead to relatively easy stair
+climbing (eventually we'll want ability to back up a smidge---some kind
+of request that persists, remembering when it started, so can back up
+for a brief time---to get away from vertical step wall so can hop it
+without turning around, moving away, turning around again,...; students
+can make stair dimensions weird.
+Actually, should make some special key give vertical, then after a few
+frames so has cleared height of 1.5 feet, give a little horizontal.
+This is a cheat, but it's a controlled cheat.  Maybe cheat more, like
+look ahead and nudge upward or something to clear the obstacle.
+Will take some work, then can go on to new stuff (shooting, monsters,
+doors, keys, flying monsters, shooting monsters (it occurred to me
+the other day that monsters that just stay put and shoot at you would
+seem pretty smart, as long as they got a report back that their bullet
+didn't go far, or something, so could randomly adjust position, or
+something.  The point is, would be nice to have smarter monsters that
+shoot back.  Also, just a FA could be good, meaning stay quiet for a
+while, etc..  I could grudgingly glance at butthead Millington's AI
+book, I guess!
+=============================
+July 26, 2017
+
+According to calculations, speed of .1 should cross world in 66.66... seconds,
+which I have verified.
+I have also verified that 3 mph is
+3*5280 / 60 min = 3*5280 / 3600 sec = 3*5280 feet / 3600*30 frames
+so brisking up a little to 3*6000 feet / 3600*30 frames = 600 / 3600 = 1/6 feet per frame,
+which is 5 feet per second, so should cross the world in 40 seconds.
+
+So, 1/6 distance unit per frame is 0.166666, so let's change to that and verify
+that it takes 40 seconds to cross (using world8 with nice camera positioning)---
+  looks good
+
+Note also that Explorer fills a 2' by 2' ground square, and is 6' tall, which is reasonable
+
+Seems reasonable to have staircases with steps that are 2' deep with a rise of 1',
+so takes 10 to go up 10', which is actually pretty steep.
+
+Now, we need to compute from Earth's gravitational acceleration of 32 feet per second squared
+what gravity impulse we should apply at each 1/30th of a second frame, and then
+we'll be able to figure the horizontal and diagonal impulse needed to nicely hop up
+1' and travel 2' horizontally for nice step hopping (note that as the player approaches
+a staircase, needs to hit the <space> for a diagonal hop about 1 foot from the bottom of
+the staircase, and repeatedly space at a steady pace to successful go up the stairs.
+Currently player will stop on hitting each step tread, so will be easy to see how it's
+going.
+
+I guess first I'll make world9 with a high floor to jump off, to verify that my discretized
+physics is causing a fall of, say, 100 feet to take the correct amount of time---
+
+when resume, use gravity = - 16/900 or maybe half or twice that---need to think about that,
+then test, then go ahead with exact physics for step situation, should work well with
+short time.
+=============================
+July 27, 2017
+
+Okay, a= 32/900 (in units of frames per seconds squared, with 30 frames per second),
+let's build world9 with 144 foot drop, see if it takes 90 frames or 3 seconds---
+
+Yes, after a lot of confusion (too much old debug output), see that it does hit ground
+at 90 frames, yay!
+
+Now, must compute horiz and vert impulses that make explorer hop up a 2 foot wide by 1 foot high
+step---
+
+Hmmm, still might have a problem in my modeling, but I'm close, but still feeling that
+cheating might be better.  
+
+  The simplest cheat would be when you hit the space bar, Explorer automatically adjusts
+velocities in flight, keeping pending requests, like first goes vertically enough frames
+to clear the step height (so even if right up against a step, you clear it cleanly),
+then auto adjust horizontal to travel sideways while dropping, will stop when hits step
+somewhere, ...
+  Hmmm, is not so easy to cheat.  Maybe I should finish debugging what I'm doing lately
+(for ALL the time I worked today (which was only three or four hours, but still...),
+maybe do a one-off cheat as follows:
+
+  when SPACE is hit, check for touching a step in direction of travel, and if we do,
+  do the ``one-off cheat'' which is to do scripted impulses to negotiate it---go vertical
+  for a carefully calculated time, then horizontal to nail the landing at exactly 1 unit
+  horizontal travel (subject to rounding error, of course), then the next <space> key will
+  see not touching a vertical step wall and will simply do the carefully crafted, rather
+  amusing hop to land in the center of the next step.
+
+Note that if I do this, I need to go back and change Builder so that Stair must be 2 feet
+horizontal and 1 foot vertical, which is not a problem, I think.
+
+  Or, I could go back to what I had before, namely have a key for pure vertical jump and
+  allow horizontal impulse in the air.
+
+Let's go with the fancier, nicer approach---less work for the user, and more elegant.
+
+In conclusion, when resume, I need to debug the current hop---TryHops.java gives good
+info, but maybe the formula is slightly wrong (there's the issue of timing---do we do an
+entire step with starting velocity, or what).  I simply need to put in output to see
+exactly where the Explorer is at each step, compare to theory.
+
+The cheat fits a general pattern I thought about today:  take the general approach that
+key inputs and other things (AI, I guess, based on sensory data) generate queued up
+requests which can have frame numbers along with them, and at the correct point in the
+update() method, each request is examined by each block personally, allowing them to
+be fulfilled, or put off if the frame number hasn't been reached, or even deleted for
+some reason.  In this scheme, a <space> puts in a request which when fulfilled looks
+to see if blocked by a vertical step wall, and if so, goes straight up at this moment,
+but also enqueues request to apply a horizontal cheaty impulse a few frames later.
+If not blocked, just applies the nice "go up high enough to clear the vertical step 
+wall and go sideways hard enough to travel 2 units by the time we get back down to
+height of 1" that I've been struggling with.
+
+This scheme might also be used for the good old "I'm dead but still displaying stuff
+for a few frames".  Actually, probably when someone collides and thus dies, it should
+probably be removed from mobile list, added to dieing list, which is traversed on each
+step to generate cool exploding or falling over or whatever display for enough frames
+to show up and gratify or punish the user (is simply a matter of making a method 
+drawDieing() that is called instead of draw().  Probably does random shards on each
+step of the correct texture map).
+
+Okay, that's it---when resume, finish the elegant hopping, disable flexibility in Builder
+that would cause problems (will just be a matter of changing key responses, I think),
+put in the scripted cheat if blocked by anything sensible (want the same cheat for
+hopping up on a piece of wall or floor, not just steps).
+=============================
+July 30, 2017
+
+Start by debugging my stair-hopping calculations/code---
+
+Have derived height above starting height at frame t:
+   H(t) = vt - (16/900) (t-1) t
+where v is the vertical velocity component and gravity is 32/900
+
+TryHops says that with v=.5, peak at t=15 with H(15)=3.7666... and
+then drops back to H(27) = 1
+
+so let's print out data on explorer and study as it hops---
+
+Dang it, I think I've been working with a stair case that is
+twice as big of steps as I thought!
+
+SO, let's make Builder only allow steps that are however wide,
+1 foot thick, 2 feet deep, and are connected diagonally
+(wasting lots of complex flexibility I coded up, but no longer
+really understand!), and, of course, can make as many stairs
+as we like in a run.
+
+Hmmm, maybe should be purely diagonal---actual human steps are...
+okay, like 7.75" max rise and 10" min run, so since my creatures
+have bases that are 2 foot by 2 foot, obviously want run to be
+2 feet (at least), with 1 foot rise close to reasonable.
+So, a typical 8' rise from level to level will have to be 16 feet
+long.  To build a staircase to the sky, would need to do two
+landings, like, seems okay.
+  When I first was working on Builder, I thought would want to
+adjust staircases to fit things, but now I realize that was naive,
+have to make floors, for example, to fit staircases.  Landings will
+be done as pieces of Floor, by the way.
+
+Okay, let's take a little digression and fix Stairs to be way 
+simpler, way more standardized---
+
+  a little scary---need to clean up the world files, can't have
+  a rogue staircase in a world---
+
+Okay, still working on Stairs --- might be double sized (look at
+Stair---sx,sy,sz for blocks is usually half the size, maybe I
+screwed that up), and maybe not arranged to not overlap---
+
+Once done with new, limited Stairs, go back to hopping---try to
+finally debug the physics, then probably add in the cheat feature
+to make stairs climbable, even by AI entities
+(this is idea from previous day of hop being interpreted as either
+an honest hop, or a cheat hop (which is straight up, put in requests
+with timing to add in a smidge horizontal after have cleared the
+step wall, land partly on the step (in real life, a person's foot
+doesn't entirely fit on a step, typically, which is a little scary
+if we think about it too much).  I've definitely been working on
+double size steps, because Explorer is 2 by 2, is only half the
+size of a step's depth.  Of course, the troublesome thing was that
+the step's were 2 units high, made it much harder to hop up!
+=============================
+August 1, 2017
+
+Okay, only have a little while, let's fix Stairs to form
+diagonal corners matching style, not overlapping---
+  hmmm, when build new Stair, putting in sizes, is double
+size, so let's redo so things are half as big---
+
+Okay, cool, I've hopped up the stairs successfully several
+times (still need the cheat, for when we butt up against
+a step).  Let's finish up this work by seeing if we can
+cut it a little closer and quicker---while I'm remembering
+the basic physics of the situation (see TryHops!).
+
+Okay, .3 (14 frames) isn't bad, is crisper, maybe try .4 when
+resume, probably not, then on with the cheaty hop.
+=============================
+August 3, 2017
+
+Let's try .4---okay, seems good.
+
+Now what?  Well, before moving on to other kinds of blocks,
+let's put in the cheat hop feature, so can always get up
+a staircase by hitting the space bar.
+
+Ooh, let's use TryHops to set shift+space to do a straight
+vertical hop clearing 6 feet, so can dodge shots by leaping
+straight up.  In fact, maybe make this just add vertical
+impulse so can be moving forward at normal speed and leap
+high?  Thinking of having a horizontal gap to be leaped
+across--- (let's not bog down, though---these refinements
+can easily be done later.  Cheat hop is worth doing because
+it is a new concept, namely requests that can be arbitrarily
+complicated, in the sense of waiting for a while and doing
+a sequence of things.
+
+Let's abstract to Request, which has a kind, which allows 
+detailed hard-coding of things.  
+  
+<space> will put in a hop request, which checks to see if
+there is a stair close in front, and if not, do normal
+hop, and if there is, do purely vertical, and enqueue another
+request that has a certain delay, then adds horizontal impulse.
+
+This is fine, but it occurs to me that we could simply always
+do the cheat hop when <space> is hit, leave fancier requests
+for later, if ever.
+
+Let's go that way for now, make <space> do a cheat hop, and
+<shift>+<space> do a special parabola that will leap over
+an 8 foot gap (humans can do this, note, pretty easily), 
+if moving when hit it, otherwise not so far horizontally.
+
+First the cheat hop---
+
+
+Hmmm, each Block will now have a requests queue---so can have
+any number of pending requests.
+
+From a higher level of perspective, the problem here is that
+the collision detection is done once and for all, and the
+various actions are done in other places, gets intricate and
+fragile.  Right now, for example, I've got:
+
+Once:
+  build tableF (register all fixed blocks, once and for all for efficiency)
+
+  On each frame:
+
+    display (seems pretty robust---need to add dieing list though)
+    processInputs (here is where keys are noticed and enqueue requests for
+                   possible later actions)
+    update:
+      register mobile blocks, viewed as stationary, in tableM
+      for each arriving block:
+        check against tableF, tableM, and if no overlap, put in mobile and register in tableM
+      for each mobile, using stationary table data:
+        determine whether supported (check all tableF, tableM) and set that attribute
+        // maybe check other stationary properties later?
+     
+
+
+Doing this outline gave me clarity:  all those stupid "want"
+attributes are dumb, cleanup with a requests queue
+and other attributes---supported, ...
+  and a lot of this will go into Block (with fulfilling requests
+  overriding to provide special stuff (wondering if gravity should
+  be done at block level, with super.fulfillRequests called by all
+  extensions of Block, but I think not worth it, hard-code gravity
+  in ones that do it (may want flying---hmmm, no, let's put gravity
+  in for all, is literally a property of all blocks---if you want to
+  fly, you've got to do own special work to counteract gravity---seems
+  safer to mimic reality)
+
+Let's leave as is to check refactoring---
+  and should 
+
+When resume, figure out why TryHops isn't matching Game after the
+refactoring---
+
+Okay, seems to be working---but let's put in each kind of assembly
+to make sure I didn't break something---
+   Seems okay.
+
+Now, let's make the request to hop cheaty, and make the jump request
+do what the hop currently does, but bigger---
+
+resume---see paper for "cheatHop" kind of request---
+=============================
+August 4, 2017
+
+I want to make jump be high enough and horizontal enough from
+a standstill to go 8 feet (that's how far an ordinary person
+(like me at some point in life when I was more spry) can standing
+broad jump), if already going with some horizontal speed, can go
+further.  Check TryHops---
+  so let's use .5 for the vertical amount (peaking out at height
+of 3.76), with horizontal for the jump so that in 30 frames (when
+reach the ground again, roughly), will have gone 8 feet---i.e.,
+8/30 
+
+Idiot---forgot to put in elapsed in the Request and update 
+
+Okay, seems to be okay, can climb stairs, leap, with these
+three keys:  space, space+shift, space+control, not great
+but there you go!
+
+Now let's do better stuff, namely making Explorer able to
+shoot bullets, and Monsters who can move about---including
+going up and down stairs---and pursue Explorer, and shoot!
+
+With these things, I'll have a game!  
+  Actually, if could figure out the controls,
+  could do the old "red vs. blue" and have a game
+much quicker, and better for two humans to play---
+but the shared keys don't really allow this.
+
+Hey, I just had a thought, that we could make an
+Explorer or Monster who runs into the vertical face of
+a Stair automatically stop and do a cheatHop, and landing
+on flat stair face could automatically do forward, so
+would automatically go up...hmmm, and run off the
+top landing and stop (so if you don't put floor at the
+ends of your stairs, monsters will be miserable).
+  The exciting idea is that collision handling can
+know what is happening and have monsters make good
+choices, so can run up and down stairs.
+  Would be nice to get sensory data about what is
+ahead, so won't like drive off a high piece of floor---
+is a new concept, really, letting Monsters know what
+is around them in some way.
+  Ooh, here's a thought---monsters could build a
+map of the world they've encountered and use it to
+navigate somewhat intelligently!?
+
+
+Let's begin (only have about an hour more today)
+  Seems promising, have all the monstres use and
+share a joint graph that they buidl each time they
+learn something...
+
+Also kmplement player firing
+=============================
+August 9, 2017
+
+Leaving in a few minutes (might be working later
+this afternoon), let's not implement the monster
+graph (I just ordered a $40 book, gentle intro
+to artificial neural nets, hoping I'll be able to
+use ANN to make monsters lovely smart, so let's
+not bother with ad hoc unprincipled approach.
+I'm looking for a new area of study for my last
+years of work (for pay, at least), have always 
+wanted to know about ANN, this book should be
+fun, see where to go from there.  I like the
+author's description---I've felt similar things
+myself about game programming.  It's self-published,
+so I might be inspired to write a similar self-published
+book on something (rigid body simulation?) someday.
+Was just thinking I could do a Intro to Game programming
+that would do graphics, rigid body simulation, artificial
+neural nets---just hit the high points of each, with
+nice conceptual underpinning (for rigid body simulation,
+say just going to develop one of many possible approaches
+for various problems).  
+  Just occurred to me that if I were going to do such a
+book, would be good to develop my own "intermediate language"
+that would be a no-frills language that easily translates
+to Java, C++, Python, C#---a sort of psuedo-code that
+is a real programming language! 
+  I could require students in 4050 to use this language
+to keep them from getting carried away!  Of course, the
+design principle here is that the language is no-frills,
+good enough for academic purposes where not overly concerned
+about doing things in a slick way.
+
+Would be especially cool if this language (Jerry's Pedagogic language---
+nope, that's JPL, Jerry's No-Frills Language---nope, that's JNFL)
+supported an elegant interface into OpenGL, using bare minimum of
+OpenGL (what I know!) but nicely, robustly.
+  
+I guess I'm not that interested in this project, actually.  It would
+be equally easy to write translator from the subset of Java that
+I use to C++, Python, C#, I suppose.  
+
+The reason I even brought this up is that when looking at ANN books,
+I noticed many mention Python, even in the title---it's like at any
+given point in history, some language is the darling of people who
+want to sell as many books as possible, the language that they think
+will be appealing to most students of that era.  Used to be Java,
+maybe, now is probably Python.  The Steve Beaty's of the world
+tend to fall prey to this, note.
+)
+
+When I resume, I'm going to put in firing Bullet instances,
+very simple randomized Monsters, and fix the physics simulation
+to do CCD.
+
+use Block method verticalImpulse to add gravity (constructor gives
+correct initial velocity)
+
+soon I will create ability of a Block to draw (usual) or
+drawDieing (when not in mobile anymore, in dieing list)
+ (add this feature to Explorer, too)
+
+When resume, finish Explorer.fire (position bullet safely away
+but near, with direction same as explorer is looking (so can
+fire upward or downward or whatever, very nice and realistic!)
+and standard bullet magnitude
+
+  Once this geometry is done, test it---first to generally see
+  bullets flying, then upgrade physics to the real thing (for the
+  first time we admit lots need to worry about lots of blocks moving,
+  not just player) and get it all working (includes bullet exploding
+  when hits anything, with nice drawDieing method, and moving from
+  mobile to dieing lists).
+
+  At this point we'll have something kind of real, the rest is just
+  fiddly details (though monsters add a lot of goodness---and I want
+  them to fire, too).
+
+=============================
+August 10, 2017
+
+okay, let's do the Explorer work, stub test firing---
+
+Looks good, in terms of placement.  When resume, upgrade
+physics simulation so bullets actually move, blow up when they
+hit anything!
