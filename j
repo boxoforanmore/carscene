@@ -1,4 +1,4 @@
-rm *.class
+rm ./*.class
 echo
 echo
 echo

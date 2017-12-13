@@ -117,6 +117,8 @@ public class Ex10 extends Basic
                                       new Vertex(0,100,20, 0,1),
                                       12 ) );
 */
+
+    // Add a ground and some buildings to the scene
     ground(50, 50, 100, 100);
     building(2, 2, 4, 4, 25);
     building(50, 60, 3, 3, 30);
@@ -177,11 +179,6 @@ public class Ex10 extends Basic
       myCar.initialPos(camera.getLocation().x, camera.getLocation().y, 0);
       myCar.rotateBy(-camera.azimuth, 0, 0, 1);
       
-/*    launch = new AutoCar();
-      myCar.scaleBy(.05, .05, .05);
-      myCar.initialPos(camera.getLocation().x, camera.getLocation().y, 0);
-      myCar.rotateBy(-camera.azimuth, 0, 0, 1);
-*/
   }// init
 
   // Creates a building based on given coordinates and size information
@@ -461,6 +458,9 @@ public class Ex10 extends Basic
 
          // keys to control the camera:
 
+
+   //   Uncomment below to restore some original controls
+
    //         if( code == GLFW_KEY_LEFT && mods == 0 )    camera.shift( -amount, 0, 0 );
    //         else if( code == GLFW_KEY_RIGHT  && mods == 0 )  camera.shift( amount, 0, 0 );
    //         else if( code == GLFW_KEY_DOWN  && mods == 0 )  camera.shift( 0, -amount, 0 );
@@ -542,33 +542,9 @@ public class Ex10 extends Basic
     car4.translateBy(speed4[0], speed4[1], 0);
     carTrack(car4, speed4);
 
-    myCar.translateBy(0.1*mySpeed*camera.getDirection().x, 0.1*mySpeed*camera.getDirection().y, 0);
+    myCarTrack(myCar, 500);
+    myCar.translateBy(0.05*mySpeed*camera.getDirection().x, 0.05*mySpeed*camera.getDirection().y, 0);
     camera.shiftTo(myCar.xpos, myCar.ypos, camera.getLocation().z);
-/*
-   if( launched == 1 ) {
-     launchX = camera.getDirection().x;
-     launchY = camera.getDirection().y;
-
-     launch.translateBy(0.5*launchX, 0.5*launchY, 0);
-     launched++;
-   }
-   else if (launched > 1) {
-     launch.translateBy(0.5*launchX, 0.5*launchY, 0);
-     launched++;
-     if(launched == 10) {
-       launched = 0;
-       launch.xpos = myCar.xpos;
-       launch.ypos = myCar.ypos;
-     }
-   }
-   else {
-     launch.translateBy(0.1*mySpeed*camera.getDirection().x, 0.1*mySpeed*camera.getDirection().y, 0);
-   }
-*/
-   // myCar.translateBy(camera.getLocation().x + speed*camera.getDirection().x, camera.getLocation().y + speed*camera.getDirection().y, 0);    
-   // myCar.translateBy();
-   // myCar
-    //  System.out.println( getStepNumber() + "================================" );
 
   }// update
 
@@ -577,12 +553,21 @@ public class Ex10 extends Basic
    // carPos[0] += speed[0];
    // carPos[1] += speed[1];
 
-    if(car.xpos >= 99 || car.xpos <= 1 || car.ypos >= 99 || car.ypos <= 1)
+    if(car.xpos >= 98.2 || car.xpos <= 1.8 || car.ypos >= 98.2 || car.ypos <= 1.8)
     {
       car.rotateBy(180, 0, 0, 1);
       speed[0] = -speed[0];
       speed[1] = -speed[1];
     }
+  }
+
+  // Keeps the main user car within the general range of the city model
+  protected void myCarTrack(AutoCar car, double outerBox) {
+    if(car.xpos >= outerBox || car.xpos <= (100-outerBox) || car.ypos >= outerBox || car.ypos <= (100-outerBox))
+    {
+      camera.turn(180);
+      myCar.rotateBy(180, 0, 0, 1);
+    }  
   }
 
   protected void display()

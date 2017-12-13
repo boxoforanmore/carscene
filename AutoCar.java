@@ -1,6 +1,7 @@
  /*
-   a fire pyramid has
-   4 fiery triangles,
+   an AutoCar has 
+   many, many,
+   triangles,
    can be resized,
    rotated, moved
 */
